@@ -14,6 +14,18 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class MainActivity extends AppCompatActivity {
     int counter = 0;
     @Override
@@ -28,19 +40,35 @@ public class MainActivity extends AppCompatActivity {
         homeBtn.setOnClickListener(new View.OnClickListener(){
             @Override
             public void onClick(View v) {
-                counter++;
-                eriescopes.setText(String.format("Clicked: %d",counter));
+                ExecutorService executor = Executors.newSingleThreadExecutor();
+                executor.execute(() -> {
+                    try {
+                        Socket socket = new Socket("www.android.com", 80);
+                        socket.setSoTimeout(5000);
+                        OutputStream outputStream = socket.getOutputStream();
 
-                if(counter == 10) {
-                    Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse( "https://hextree.io"));
-                    startActivity(browserIntent);
-                }
+                        BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                        String request = "GET / HTTP/1.1\r\nHost: www.android.com\r\nUser-Agent: app\r\nAccept: */*\r\n\r\n";
+                        outputStream.write(request.getBytes());
+                        outputStream.flush();
+
+                        StringBuilder sb = new StringBuilder();
+
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            String finalLine = line;
+                            runOnUiThread(() -> eriescopes.append(finalLine));
+                        }
+                        String result = sb.toString();
+                        outputStream.close();
+
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+
+                });
             }
         });
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
-            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
-            return insets;
-        });
+
     }
 }
